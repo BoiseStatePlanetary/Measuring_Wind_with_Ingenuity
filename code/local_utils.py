@@ -1,6 +1,20 @@
 import numpy as np
 from scipy.optimize import curve_fit
 
+import pds4_tools as pds
+from datetime import datetime, timedelta
+from itertools import cycle
+
+aspect_ratio = 16./9 # On HD projectors nowadays, this is the aspect ratio.
+                     # so I make my figures using that ratio so they show up nicely in presentations.
+BoiseState_blue = "#0033A0"
+BoiseState_orange = "#D64309"
+
+colors = cycle([BoiseState_blue, BoiseState_orange, "green", "purple"])
+
+str2date = lambda x: datetime.strptime(x, '00133M%H:%M:%S.%f')
+str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
+
 def calc_zstar_from_slope_and_intercept(z0, slope, intercept):
     return z0*np.exp(-intercept/slope)
 
@@ -234,3 +248,26 @@ def calc_sigma_zstar(z0, slope, intercept, sigma_slope, sigma_intercept, kappa=0
 
 def calc_sigma_ustar(sigma_slope, kappa=0.4):
     return kappa*sigma_slope
+
+def retrieve_time_wind(xml_file,
+    start_time=datetime(1900, 1, 1, 7, 0, 0),
+    end_time=datetime(1900, 1, 1, 8, 0, 0)):
+
+    struct_list = pds.read(xml_file)
+
+    time = np.array(str2dates(struct_list['TABLE']['LMST']))
+    wind = np.array(struct_list['TABLE']['HORIZONTAL_WIND_SPEED'])
+
+    if((start_time is None) or (end_time is None)):
+        ind = wind != 999999999
+        time = time[ind]
+        wind = wind[ind]
+
+    else:
+        ind = (wind != 999999999) & (time > start_time) & (time < end_time)
+
+        time = time[ind]
+        wind = wind[ind]
+
+    return time, wind
+
