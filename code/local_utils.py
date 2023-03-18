@@ -3,6 +3,7 @@ from scipy.optimize import curve_fit
 
 import pds4_tools as pds
 from datetime import datetime, timedelta
+import matplotlib.dates as md
 
 aspect_ratio = 16./9 
 BoiseState_blue = "#0033A0"
@@ -13,6 +14,10 @@ str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 
 zs = np.array([75., 150., 300., 600., 1200.])
 sampling_duration = 10. # seconds to sample an altitude
+sample_time = timedelta(seconds=sampling_duration) # as a time delta
+
+start_time = datetime(1900, 1, 1, 7, 0, 0)
+end_time = datetime(1900, 1, 1, 8, 0, 0)
 
 def calc_zstar_from_slope_and_intercept(z0, slope, intercept):
     return z0*np.exp(-intercept/slope)
@@ -248,9 +253,7 @@ def calc_sigma_zstar(z0, slope, intercept, sigma_slope, sigma_intercept, kappa=0
 def calc_sigma_ustar(sigma_slope, kappa=0.4):
     return kappa*sigma_slope
 
-def retrieve_time_wind(xml_file,
-    start_time=datetime(1900, 1, 1, 7, 0, 0),
-    end_time=datetime(1900, 1, 1, 8, 0, 0)):
+def retrieve_time_wind(xml_file, start_time=start_time, end_time=end_time):
 
     struct_list = pds.read(xml_file)
 
@@ -335,3 +338,150 @@ def sample_wind_profile(sample_time, t0, time, windspeeds, heights):
         cur_t0 += sample_time
 
     return averaged_windspeeds, std_windspeeds
+
+def make_plot_of_original_and_scaled_windspeeds(time, wind, zs, sample_time, t0,
+    scaled_windspeeds, averaged_windspeeds, ax):
+
+    from itertools import cycle
+    colors = cycle([BoiseState_blue, BoiseState_orange, "green", "purple"])
+
+    ax.plot(time, wind, lw=3, color=BoiseState_blue, label="MEDA")
+
+    cur_t0 = t0
+    for i in range(len(zs)):
+        ind = retrieve_relevant_times(time, cur_t0, sample_time)
+        cur_color = next(colors)
+        ax.plot(time[ind], scaled_windspeeds[i][ind],
+             label=r'$%g\, {\rm cm}$' % zs[i], lw=6, color=cur_color, alpha=0.5)
+        ax.plot([np.min(time[ind]), np.max(time[ind])],
+            [averaged_windspeeds[i], averaged_windspeeds[i]], lw=6, ls='--', 
+            color='k')
+        cur_t0 += sample_time
+
+
+    xfmt = md.DateFormatter('%M:%S')
+    ax.xaxis.set_major_formatter(xfmt)
+    ax.grid(True)
+    ax.tick_params(axis="x", labelsize=12)
+    ax.tick_params(axis="y", labelsize=36)
+    ax.set_xlabel("LMST - %g" % (start_time.hour), fontsize=36)
+    ax.set_ylabel(r'$U\ \left( {\rm cm\ s^{-1}} \right)$', fontsize=36)
+    ax.legend(loc='best', fontsize=18)
+    return ax
+
+def fit_lin_fit(zs, winds, std_winds):
+
+    log_z = np.log(zs/np.min(zs))
+    popt, pcov = curve_fit(lin_fit, log_z, winds, sigma=std_winds)
+    unc = np.sqrt(np.diag(pcov))
+
+    return log_z, popt, unc, pcov
+
+def fit_wind_profile_and_drop_outliers(zs, averaged_windspeeds, std_windspeeds, 
+    drop_outliers=True, num_sigma=5., rescale_unc=True):
+
+    inlier_zs = zs
+    inlier_averaged_windspeeds = averaged_windspeeds
+    inlier_std_windspeeds = std_windspeeds
+
+    outlier_zs = np.array([])
+    outlier_averaged_windspeeds = np.array([])
+    outlier_std_windspeeds = np.array([])
+
+    if(drop_outliers):
+        inlier_zs = zs[0]
+        inlier_averaged_windspeeds = averaged_windspeeds[0]
+        inlier_std_windspeeds = std_windspeeds[0]
+
+        for i in range(1, len(zs)):
+            if(np.all(averaged_windspeeds[i] > averaged_windspeeds[0:i])):
+                inlier_zs = np.append(inlier_zs, zs[i])
+                inlier_averaged_windspeeds =\
+                    np.append(inlier_averaged_windspeeds, 
+                    averaged_windspeeds[i])
+                inlier_std_windspeeds =\
+                    np.append(inlier_std_windspeeds, std_windspeeds[i])
+            else:
+                outlier_zs = np.append(outlier_zs, zs[i])
+                outlier_averaged_windspeeds =\
+                    np.append(outlier_averaged_windspeeds, 
+                    averaged_windspeeds[i])
+                outlier_std_windspeeds = np.append(outlier_std_windspeeds, 
+                    std_windspeeds[i])
+
+        log_z, popt, unc, pcov = fit_lin_fit(inlier_zs, 
+            inlier_averaged_windspeeds, inlier_std_windspeeds)
+
+        # And now let's toss outliers
+        inliers = np.abs(inlier_averaged_windspeeds -\
+            np.polyval(popt, log_z))/inlier_std_windspeeds <= num_sigma
+
+        if(len(inlier_averaged_windspeeds[~inliers]) > 0):
+            outlier_zs = np.append(outlier_zs, inlier_zs[~inlier])
+            outlier_averaged_windspeeds =\
+                np.append(outlier_averaged_windspeeds,
+                inlier_averaged_windspeeds[~inlier])
+            outlier_std_windspeeds = np.append(outlier_std_windspeeds,
+                inlier_std_windspeeds[~inlier])        
+
+        inlier_zs = inlier_zs[inliers]
+        inlier_averaged_windspeeds = inlier_averaged_windspeeds[inliers]
+        inlier_std_windspeeds = inlier_std_windspeeds[inliers]
+
+    log_z, popt, unc, pcov = fit_lin_fit(inlier_zs, inlier_averaged_windspeeds,
+        inlier_std_windspeeds)
+
+    # Rescale uncertainties
+    #_NR_, 3rd ed, p. 783 - This equation provides a way to rescale
+    # uncertainties, enforcing reduced chi-squared = 1
+    if(rescale_unc):
+        mod = np.polyval(popt, log_z)
+        chisq = chisqg(inlier_averaged_windspeeds, mod,
+            sd=inlier_std_windspeeds)
+
+        red_chi_sq = chisq/(len(inlier_averaged_windspeeds) - len(popt))
+
+        unc *= np.sqrt(red_chi_sq)
+        inlier_std_windspeeds *= np.sqrt(red_chi_sq)
+        pcov *= red_chi_sq
+
+    return inlier_zs, inlier_averaged_windspeeds, inlier_std_windspeeds,\
+        outlier_zs, outlier_averaged_windspeeds, outlier_std_windspeeds,\
+        popt, unc, pcov
+
+def collect_fit_values_and_unc(popt, unc, pcov, kappa=0.4):
+
+    ustar = calc_ustar_from_slope(kappa, popt[0])
+    zstar = calc_zstar_from_slope_and_intercept(np.min(zs), popt[0], popt[1])
+    sigma_ustar = 0.4*unc[0]
+    sigma_zstar = zstar*popt[1]/popt[0]*np.sqrt((unc[0]/popt[0])**2 +\
+        (unc[1]/popt[1])**2 - 2*pcov[1,0]/popt[0]/popt[1])
+
+    return ustar, zstar, sigma_ustar, sigma_zstar
+
+def make_plot_of_wind_data_and_profile(inlier_zs, inlier_averaged_windspeeds, 
+    inlier_std_windspeeds, outlier_zs, outlier_averaged_windspeeds, 
+    outlier_std_windspeeds, popt, unc, ax):
+
+    ax.errorbar(inlier_averaged_windspeeds, inlier_zs, 
+        xerr=inlier_std_windspeeds, 
+        marker='o', markersize=10, color=BoiseState_blue, ls='')
+
+    # Show tossed points
+    ax.errorbar(outlier_averaged_windspeeds, outlier_zs,
+    xerr=outlier_std_windspeeds,
+    marker='x', markersize=10, color='k', ls='')
+
+    log_z = np.log(zs/np.min(zs))
+    ax.plot(np.polyval(popt, log_z), zs, 
+        lw=6, color=BoiseState_orange, ls='--', zorder=-1)
+
+    ax.grid(True)
+    ax.yaxis.tick_right()
+    ax.yaxis.set_label_position("right")
+    ax.tick_params(labelsize=24)
+    ax.set_xlabel(r'$\langle U \rangle \, \left( {\rm cm\ s^{-1} } \right)$', 
+        fontsize=36)
+    ax.set_ylabel(r'$z\, \left( {\rm cm } \right)$', fontsize=36)
+
+    return ax
