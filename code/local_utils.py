@@ -3,17 +3,16 @@ from scipy.optimize import curve_fit
 
 import pds4_tools as pds
 from datetime import datetime, timedelta
-from itertools import cycle
 
-aspect_ratio = 16./9 # On HD projectors nowadays, this is the aspect ratio.
-                     # so I make my figures using that ratio so they show up nicely in presentations.
+aspect_ratio = 16./9 
 BoiseState_blue = "#0033A0"
 BoiseState_orange = "#D64309"
 
-colors = cycle([BoiseState_blue, BoiseState_orange, "green", "purple"])
-
 str2date = lambda x: datetime.strptime(x, '00133M%H:%M:%S.%f')
 str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
+
+zs = np.array([75., 150., 300., 600., 1200.])
+sampling_duration = 10. # seconds to sample an altitude
 
 def calc_zstar_from_slope_and_intercept(z0, slope, intercept):
     return z0*np.exp(-intercept/slope)
@@ -271,3 +270,68 @@ def retrieve_time_wind(xml_file,
 
     return time, wind
 
+def calculate_scaled_windspeed(windspeeds_to_scale, z, zstar, z0=150.):
+    """
+    Returns wind speed time series scaled as if it were measured at a different elevation,
+    assuming a logarithmic wind profile
+
+    Args:
+        windspeeds_to_scale (float array): wind speeds to scale
+        z (float): altitude at which measurement is assumed to take place
+        zstar (float): the roughness scale - https://en.wikipedia.org/wiki/Roughness_length
+        z0 (float, optional): altitude at which actual wind speed measurement was made; defaults to 1.5 meters
+        kappa (float, optional): von Karman parameter; defaults to 0.4
+
+    Returns:
+        Scaled wind speed time series
+
+    """
+
+    # Calculate ustar assuming average windspeeds_to_scale
+    return windspeeds_to_scale*np.log(z/zstar)/np.log(z0/zstar)
+
+def create_synthetic_wind_profile(windspeeds_to_scale, zs, zstar, z0=150.):
+
+    scaled_windspeeds = calculate_scaled_windspeed(windspeeds_to_scale, zs[0], 
+        zstar, z0=z0)
+    for i in range(1, len(zs)):    
+        scaled_windspeeds = np.vstack([scaled_windspeeds,
+            calculate_scaled_windspeed(windspeeds_to_scale, zs[i], zstar, 
+            z0=z0)])
+
+    return scaled_windspeeds
+
+def retrieve_relevant_times(time, t0, sample_time):
+    return (t0 <= time) & (time <= t0 + sample_time)
+
+def sample_wind_profile(sample_time, t0, time, windspeeds, heights):
+    """
+    Return wind speeds from four height sampled over the given sample time
+
+    Args:
+        sample_time (float): time over which to average in seconds
+        t0 (float, optional): time at which at start averages
+        times (float array): measured times
+        windspeeds (float array): wind speed time-series referenced by anemometer height
+
+    Returns:
+        Wind speeds averaged for sample time from different anemometer times series, one after another
+    """
+
+    # Run through each height, assuming the first one in windspeeds is the 
+    # lowest and on up
+    cur_t0 = t0
+    averaged_windspeeds = np.zeros_like(heights)
+    std_windspeeds = np.zeros_like(heights)
+    for i in range(len(heights)):
+        ind = retrieve_relevant_times(time, cur_t0, sample_time)
+
+        averaged_windspeeds[i] = np.mean(windspeeds[i][ind])
+
+        # error of the mean
+        std_windspeeds[i] = np.std(windspeeds[i][ind])/\
+            (np.sqrt(len(windspeeds[i][ind]) - 1.))
+
+        cur_t0 += sample_time
+
+    return averaged_windspeeds, std_windspeeds
