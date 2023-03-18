@@ -9,7 +9,7 @@ aspect_ratio = 16./9
 BoiseState_blue = "#0033A0"
 BoiseState_orange = "#D64309"
 
-str2date = lambda x: datetime.strptime(x, '00133M%H:%M:%S.%f')
+str2date = lambda x: datetime.strptime(x, '%H:%M:%S.%f')
 str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 
 zs = np.array([75., 150., 300., 600., 1200.])
@@ -256,8 +256,9 @@ def calc_sigma_ustar(sigma_slope, kappa=0.4):
 def retrieve_time_wind(xml_file, start_time=start_time, end_time=end_time):
 
     struct_list = pds.read(xml_file)
-
-    time = np.array(str2dates(struct_list['TABLE']['LMST']))
+    time_list = list(map(lambda x: x.split('M')[1],
+        struct_list['TABLE']['LMST']))
+    time = np.array(str2dates(time_list))
     wind = np.array(struct_list['TABLE']['HORIZONTAL_WIND_SPEED'])
 
     if((start_time is None) or (end_time is None)):
@@ -461,7 +462,10 @@ def collect_fit_values_and_unc(popt, unc, pcov, kappa=0.4):
 
 def make_plot_of_wind_data_and_profile(inlier_zs, inlier_averaged_windspeeds, 
     inlier_std_windspeeds, outlier_zs, outlier_averaged_windspeeds, 
-    outlier_std_windspeeds, popt, unc, ax):
+    outlier_std_windspeeds, popt, unc, pcov, ax):
+
+    ustar, zstar, sigma_ustar, sigma_zstar =\
+        collect_fit_values_and_unc(popt, unc, pcov)
 
     ax.errorbar(inlier_averaged_windspeeds, inlier_zs, 
         xerr=inlier_std_windspeeds, 
@@ -483,5 +487,14 @@ def make_plot_of_wind_data_and_profile(inlier_zs, inlier_averaged_windspeeds,
     ax.set_xlabel(r'$\langle U \rangle \, \left( {\rm cm\ s^{-1} } \right)$', 
         fontsize=36)
     ax.set_ylabel(r'$z\, \left( {\rm cm } \right)$', fontsize=36)
+
+    ax.text(0.05, 0.90, "(b)", fontsize=48, transform=ax.transAxes)
+    ax.text(0.05, 0.825, 
+        r'$u_\star = \left( %.0f\pm%.0f \right)\,{\rm cm\ s^{-1}}$' %\
+        (ustar, sigma_ustar), fontsize=28, transform=ax.transAxes, 
+        color=BoiseState_orange)
+    ax.text(0.05, 0.775, r'$z_\star = \left( %.2f\pm%.2f \right)\,{\rm cm}$' %\
+        (zstar, sigma_zstar), fontsize=28, transform=ax.transAxes, 
+        color=BoiseState_orange)
 
     return ax
