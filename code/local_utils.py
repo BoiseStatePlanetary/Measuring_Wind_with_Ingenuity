@@ -13,6 +13,9 @@ str2date = lambda x: datetime.strptime(x, '%H:%M:%S.%f')
 str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 
 zs = np.array([75., 150., 300., 600., 1200.])
+#zs = np.array([150., 300., 600., 1200.])
+#zs = np.array([30., 60., 120., 240., 480.])
+#zs = np.array([100., 200., 300., 400., 500., 600., 700., 800., 900., 1000.])
 sampling_duration = 10. # seconds to sample an altitude
 sample_time = timedelta(seconds=sampling_duration) # as a time delta
 
@@ -410,6 +413,13 @@ def fit_wind_profile_and_drop_outliers(zs, averaged_windspeeds, std_windspeeds,
                 outlier_std_windspeeds = np.append(outlier_std_windspeeds, 
                     std_windspeeds[i])
 
+        # Check that there are at least three points
+        if(type(inlier_averaged_windspeeds) is not np.ndarray):
+            return inlier_zs, inlier_averaged_windspeeds,\
+                inlier_std_windspeeds, outlier_zs,\
+                outlier_averaged_windspeeds, outlier_std_windspeeds,\
+                None, None, None
+
         log_z, popt, unc, pcov = fit_lin_fit(inlier_zs, 
             inlier_averaged_windspeeds, inlier_std_windspeeds)
 
@@ -418,24 +428,31 @@ def fit_wind_profile_and_drop_outliers(zs, averaged_windspeeds, std_windspeeds,
             np.polyval(popt, log_z))/inlier_std_windspeeds <= num_sigma
 
         if(len(inlier_averaged_windspeeds[~inliers]) > 0):
-            outlier_zs = np.append(outlier_zs, inlier_zs[~inlier])
+            outlier_zs = np.append(outlier_zs, inlier_zs[~inliers])
             outlier_averaged_windspeeds =\
                 np.append(outlier_averaged_windspeeds,
-                inlier_averaged_windspeeds[~inlier])
+                inlier_averaged_windspeeds[~inliers])
             outlier_std_windspeeds = np.append(outlier_std_windspeeds,
-                inlier_std_windspeeds[~inlier])        
+                inlier_std_windspeeds[~inliers])        
 
         inlier_zs = inlier_zs[inliers]
         inlier_averaged_windspeeds = inlier_averaged_windspeeds[inliers]
         inlier_std_windspeeds = inlier_std_windspeeds[inliers]
 
-    log_z, popt, unc, pcov = fit_lin_fit(inlier_zs, inlier_averaged_windspeeds,
-        inlier_std_windspeeds)
+    if(len(inlier_zs) <= 2):
+        return inlier_zs, inlier_averaged_windspeeds,\
+                inlier_std_windspeeds, outlier_zs,\
+                outlier_averaged_windspeeds, outlier_std_windspeeds,\
+                None, None, None
+    log_z, popt, unc, pcov = fit_lin_fit(inlier_zs,\
+        inlier_averaged_windspeeds, inlier_std_windspeeds)
 
     # Rescale uncertainties
     #_NR_, 3rd ed, p. 783 - This equation provides a way to rescale
     # uncertainties, enforcing reduced chi-squared = 1
-    if(rescale_unc):
+    # 
+    #Also, make sure you have more than two points. Otherwise, can't rescale.
+    if((rescale_unc) & (len(inlier_zs) > 2)):
         mod = np.polyval(popt, log_z)
         chisq = chisqg(inlier_averaged_windspeeds, mod,
             sd=inlier_std_windspeeds)
