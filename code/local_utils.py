@@ -5,6 +5,8 @@ import pds4_tools as pds
 from datetime import datetime, timedelta
 import matplotlib.dates as md
 
+from scipy.stats import median_abs_deviation as mad
+
 aspect_ratio = 16./9 
 BoiseState_blue = "#0033A0"
 BoiseState_orange = "#D64309"
@@ -16,7 +18,7 @@ zs = np.array([75., 150., 300., 600., 1200.])
 #zs = np.array([150., 300., 600., 1200.])
 #zs = np.array([30., 60., 120., 240., 480.])
 #zs = np.array([100., 200., 300., 400., 500., 600., 700., 800., 900., 1000.])
-sampling_duration = 10. # seconds to sample an altitude
+sampling_duration = 20. # seconds to sample an altitude
 sample_time = timedelta(seconds=sampling_duration) # as a time delta
 
 start_time = datetime(1900, 1, 1, 7, 0, 0)
@@ -336,10 +338,10 @@ def sample_wind_profile(sample_time, t0, time, windspeeds, heights):
     for i in range(len(heights)):
         ind = retrieve_relevant_times(time, cur_t0, sample_time)
 
-        averaged_windspeeds[i] = np.mean(windspeeds[i][ind])
+        averaged_windspeeds[i] = np.median(windspeeds[i][ind])
 
-        # error of the mean
-        std_windspeeds[i] = np.std(windspeeds[i][ind])/\
+        # error of the mean - en.wikipedia.org/wiki/Median_absolute_deviation
+        std_windspeeds[i] = 1.4826*mad(windspeeds[i][ind])/\
             (np.sqrt(len(windspeeds[i][ind]) - 1.))
 
         cur_t0 += sample_time
