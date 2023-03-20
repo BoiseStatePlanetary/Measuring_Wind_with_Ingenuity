@@ -295,7 +295,10 @@ def calculate_scaled_windspeed(windspeeds_to_scale, z, zstar, z0=150.):
     """
 
     # Calculate ustar assuming average windspeeds_to_scale
-    return windspeeds_to_scale*np.log(z/zstar)/np.log(z0/zstar)
+
+    men = np.mean(windspeeds_to_scale)
+
+    return (windspeeds_to_scale - men) + men*np.log(z/zstar)/np.log(z0/zstar)
 
 def create_synthetic_wind_profile(windspeeds_to_scale, zs, zstar, z0=150.):
 
@@ -381,8 +384,33 @@ def fit_lin_fit(zs, winds, std_winds):
 
     return log_z, popt, unc, pcov
 
+def toss_nonascending_windspeeds(zs, averaged_windspeeds, std_windspeeds,
+    consider_scaled_residuals=False):
+
+    # Indices for inliers and outliers
+    inliers = [0]
+    outliers = []
+
+    for i in range(1, len(zs)):
+        residuals = averaged_windspeeds[i] - averaged_windspeeds[0:i]
+        residual_threshold = 0.
+
+        # Do you want to scale the residuals by the uncertainties?
+        if(consider_scaled_residuals):
+            # Scale by uncertainties added in quadrature
+            residuals /= np.sqrt(std_windspeeds[i]**2 + std_windspeeds[0:i]**2)
+            residual_threshold = 1.
+
+        if(np.all(residuals > residual_threshold)):
+            inliers.append(i)
+        else:
+            outliers.append(i)
+
+    return inliers, outliers
+
 def fit_wind_profile_and_drop_outliers(zs, averaged_windspeeds, std_windspeeds, 
-    drop_outliers=True, num_sigma=5., rescale_unc=True):
+    drop_outliers=True, num_sigma=5., rescale_unc=True, 
+    consider_scaled_uncertainties=False):
 
     inlier_zs = zs
     inlier_averaged_windspeeds = averaged_windspeeds
@@ -392,38 +420,36 @@ def fit_wind_profile_and_drop_outliers(zs, averaged_windspeeds, std_windspeeds,
     outlier_averaged_windspeeds = np.array([])
     outlier_std_windspeeds = np.array([])
 
+    # Fit wind profile
+    log_z, popt, unc, pcov = fit_lin_fit(inlier_zs,
+        inlier_averaged_windspeeds, inlier_std_windspeeds)
+
     if(drop_outliers):
-        inlier_zs = zs[0]
-        inlier_averaged_windspeeds = averaged_windspeeds[0]
-        inlier_std_windspeeds = std_windspeeds[0]
+        # Toss points for which the wind speed does NOT increase with altitude
+        inliers, outliers = toss_nonascending_windspeeds(inlier_zs,
+                inlier_averaged_windspeeds, inlier_std_windspeeds)
 
-        for i in range(1, len(zs)):
-            if(np.all(averaged_windspeeds[i] > averaged_windspeeds[0:i])):
-                inlier_zs = np.append(inlier_zs, zs[i])
-                inlier_averaged_windspeeds =\
-                    np.append(inlier_averaged_windspeeds, 
-                    averaged_windspeeds[i])
-                inlier_std_windspeeds =\
-                    np.append(inlier_std_windspeeds, std_windspeeds[i])
-            else:
-                outlier_zs = np.append(outlier_zs, zs[i])
-                outlier_averaged_windspeeds =\
-                    np.append(outlier_averaged_windspeeds, 
-                    averaged_windspeeds[i])
-                outlier_std_windspeeds = np.append(outlier_std_windspeeds, 
-                    std_windspeeds[i])
-
-        # Check that there are at least three points
-        if(type(inlier_averaged_windspeeds) is not np.ndarray):
+        # Check that there are at least two points.
+        if(len(inlier_zs[inliers]) < 2):
             return inlier_zs, inlier_averaged_windspeeds,\
                 inlier_std_windspeeds, outlier_zs,\
                 outlier_averaged_windspeeds, outlier_std_windspeeds,\
-                None, None, None
+                np.array([-1.]), np.array([-1.]), np.array([-1.])
 
-        log_z, popt, unc, pcov = fit_lin_fit(inlier_zs, 
+        if(len(inlier_zs[outliers]) > 0):
+            outlier_zs = zs[outliers]
+            outlier_averaged_windspeeds = averaged_windspeeds[outliers]
+            outlier_std_windspeeds = std_windspeeds[outliers]
+        inlier_zs = zs[inliers]
+        inlier_averaged_windspeeds = averaged_windspeeds[inliers]
+        inlier_std_windspeeds = std_windspeeds[inliers]
+
+        # And now let's toss points that don't agree with profile model
+    
+        # Fit wind profile
+        log_z, popt, unc, pcov = fit_lin_fit(inlier_zs,
             inlier_averaged_windspeeds, inlier_std_windspeeds)
 
-        # And now let's toss outliers
         inliers = np.abs(inlier_averaged_windspeeds -\
             np.polyval(popt, log_z))/inlier_std_windspeeds <= num_sigma
 
@@ -439,13 +465,15 @@ def fit_wind_profile_and_drop_outliers(zs, averaged_windspeeds, std_windspeeds,
         inlier_averaged_windspeeds = inlier_averaged_windspeeds[inliers]
         inlier_std_windspeeds = inlier_std_windspeeds[inliers]
 
-    if(len(inlier_zs) <= 2):
-        return inlier_zs, inlier_averaged_windspeeds,\
-                inlier_std_windspeeds, outlier_zs,\
-                outlier_averaged_windspeeds, outlier_std_windspeeds,\
-                None, None, None
-    log_z, popt, unc, pcov = fit_lin_fit(inlier_zs,\
-        inlier_averaged_windspeeds, inlier_std_windspeeds)
+        if(len(inlier_zs) <= 2):
+            return inlier_zs, inlier_averaged_windspeeds,\
+            inlier_std_windspeeds, outlier_zs, outlier_averaged_windspeeds,\
+            outlier_std_windspeeds,\
+            np.array([-1.]), np.array([-1.]), np.array([-1.])
+
+        # Re-fit with outliers dropped        
+        log_z, popt, unc, pcov = fit_lin_fit(inlier_zs,
+            inlier_averaged_windspeeds, inlier_std_windspeeds)
 
     # Rescale uncertainties
     #_NR_, 3rd ed, p. 783 - This equation provides a way to rescale
@@ -462,6 +490,23 @@ def fit_wind_profile_and_drop_outliers(zs, averaged_windspeeds, std_windspeeds,
         unc *= np.sqrt(red_chi_sq)
         inlier_std_windspeeds *= np.sqrt(red_chi_sq)
         pcov *= red_chi_sq
+
+    # And then enforce increasing winds with altitude, considering unc
+    if(drop_outliers & consider_scaled_uncertainties):
+        inliers, outliers = toss_nonascending_windspeeds(inlier_zs,
+            inlier_averaged_windspeeds, inlier_std_windspeeds, 
+            consider_scaled_residuals=True)
+
+        if(len(inlier_zs[outliers]) > 0):
+            outlier_zs = np.append(outlier_zs, inlier_zs[outliers])
+            outlier_averaged_windspeeds =\
+                np.append(outlier_averaged_windspeeds,
+                    inlier_averaged_windspeeds[outliers])
+            outlier_std_windspeeds = np.append(outlier_std_windspeeds, 
+                inlier_std_windspeeds[outliers])
+        inlier_zs = inlier_zs[inliers]
+        inlier_averaged_windspeeds = inlier_averaged_windspeeds[inliers]
+        inlier_std_windspeeds = inlier_std_windspeeds[inliers]
 
     return inlier_zs, inlier_averaged_windspeeds, inlier_std_windspeeds,\
         outlier_zs, outlier_averaged_windspeeds, outlier_std_windspeeds,\
