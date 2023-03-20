@@ -22,6 +22,8 @@ sample_time = timedelta(seconds=sampling_duration) # as a time delta
 start_time = datetime(1900, 1, 1, 7, 0, 0)
 end_time = datetime(1900, 1, 1, 8, 0, 0)
 
+kappa = 0.4
+
 def calc_zstar_from_slope_and_intercept(z0, slope, intercept):
     return z0*np.exp(-intercept/slope)
 
@@ -296,9 +298,7 @@ def calculate_scaled_windspeed(windspeeds_to_scale, z, zstar, z0=150.):
 
     # Calculate ustar assuming average windspeeds_to_scale
 
-    men = np.mean(windspeeds_to_scale)
-
-    return (windspeeds_to_scale - men) + men*np.log(z/zstar)/np.log(z0/zstar)
+    return windspeeds_to_scale*np.log(z/zstar)/np.log(z0/zstar)
 
 def create_synthetic_wind_profile(windspeeds_to_scale, zs, zstar, z0=150.):
 
@@ -376,9 +376,9 @@ def make_plot_of_original_and_scaled_windspeeds(time, wind, zs, sample_time, t0,
     ax.legend(loc='best', fontsize=18)
     return ax
 
-def fit_lin_fit(zs, winds, std_winds):
+def fit_lin_fit(zs, winds, std_winds, z0=np.min(zs)):
 
-    log_z = np.log(zs/np.min(zs))
+    log_z = np.log(zs/z0)
     popt, pcov = curve_fit(lin_fit, log_z, winds, sigma=std_winds)
     unc = np.sqrt(np.diag(pcov))
 
@@ -507,7 +507,7 @@ def fit_wind_profile_and_drop_outliers(zs, averaged_windspeeds, std_windspeeds,
         inlier_zs = inlier_zs[inliers]
         inlier_averaged_windspeeds = inlier_averaged_windspeeds[inliers]
         inlier_std_windspeeds = inlier_std_windspeeds[inliers]
-
+    
     return inlier_zs, inlier_averaged_windspeeds, inlier_std_windspeeds,\
         outlier_zs, outlier_averaged_windspeeds, outlier_std_windspeeds,\
         popt, unc, pcov
@@ -538,8 +538,8 @@ def make_plot_of_wind_data_and_profile(inlier_zs, inlier_averaged_windspeeds,
     xerr=outlier_std_windspeeds,
     marker='x', markersize=10, color='k', ls='')
 
-    log_z = np.log(zs/np.min(zs))
-    ax.plot(np.polyval(popt, log_z), zs, 
+    log_z = np.log(inlier_zs/np.min(zs))
+    ax.plot(np.polyval(popt, log_z), inlier_zs, 
         lw=6, color=BoiseState_orange, ls='--', zorder=-1)
 
     ax.grid(True)
