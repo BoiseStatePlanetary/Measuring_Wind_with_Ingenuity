@@ -14,11 +14,15 @@ BoiseState_orange = "#D64309"
 str2date = lambda x: datetime.strptime(x, '%H:%M:%S.%f')
 str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 
-zs = np.array([75., 150., 300., 600., 1200.])
+#zs = np.array([75., 150., 300., 600., 1200.])
+#zs = np.array([150., 600., 1200.])
+notional_z0 = 30.
+factor = 4.
+zs = np.array([notional_z0, factor*notional_z0, factor*factor*notional_z0])
 #zs = np.array([150., 300., 600., 1200.])
 #zs = np.array([30., 60., 120., 240., 480.])
 #zs = np.array([100., 200., 300., 400., 500., 600., 700., 800., 900., 1000.])
-sampling_duration = 20. # seconds to sample an altitude
+sampling_duration = 40. # seconds to sample an altitude
 sample_time = timedelta(seconds=sampling_duration) # as a time delta
 
 start_time = datetime(1900, 1, 1, 7, 0, 0)
