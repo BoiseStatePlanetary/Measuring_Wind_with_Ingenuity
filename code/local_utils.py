@@ -14,15 +14,15 @@ BoiseState_orange = "#D64309"
 str2date = lambda x: datetime.strptime(x, '%H:%M:%S.%f')
 str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 
-zs = np.array([75., 150., 300., 600., 1200.])
+zs = np.array([150., 300., 600., 1200.])
 #zs = np.array([150., 600., 1200.])
 #notional_z0 = 150.
-#factor = 4.
+#factor = 2.
 #zs = np.array([notional_z0, factor*notional_z0, factor*factor*notional_z0])
 #zs = np.array([150., 300., 600., 1200.])
 #zs = np.array([30., 60., 120., 240., 480.])
 #zs = np.array([100., 200., 300., 400., 500., 600., 700., 800., 900., 1000.])
-sampling_duration = 10. # seconds to sample an altitude
+sampling_duration = 40. # seconds to sample an altitude
 sample_time = timedelta(seconds=sampling_duration) # as a time delta
 
 start_time = datetime(1900, 1, 1, 7, 0, 0)
@@ -566,3 +566,30 @@ def make_plot_of_wind_data_and_profile(inlier_zs, inlier_averaged_windspeeds,
         color=BoiseState_orange)
 
     return ax
+def calc_delta_u(u):
+    # Assumes u is sorted in ascending order
+    return u[1:] - u[0]
+
+def calc_sigma_delta_u(sigma_u):
+    # Assumes u is sorted in ascending order
+    return np.sqrt(sigma_u[1:]**2 + sigma_u[0]**2)
+
+def calc_u_prime(u, u_star):
+    return kappa*u/u_star
+
+def calc_sigma_scaled_u(u_prime, u_star, u, sigma_u_star, sigma_u):
+    return u_prime*np.sqrt((sigma_u_star/u_star)**2 + (sigma_u/u)**2)
+
+def fit_delta_u(z, u_star):
+    # Assumes z is sorted in ascending order
+    log_z = np.log(z[1:]/z[0])
+
+    return u_star/kappa*log_z
+
+def fit_log_zstar(z, z_star):
+    # Assumes z is sorted in ascending order
+    log_z = np.log(z/z[0])
+    log_z_star = np.log(z_star/z[0])
+
+    return log_z - log_z_star
+
