@@ -14,11 +14,11 @@ BoiseState_orange = "#D64309"
 str2date = lambda x: datetime.strptime(x, '%H:%M:%S.%f')
 str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 
-zs = np.array([150., 300., 600., 1200.])
+#zs = np.array([150., 300., 600., 1200.])
 #zs = np.array([150., 600., 1200.])
-#notional_z0 = 150.
-#factor = 2.
-#zs = np.array([notional_z0, factor*notional_z0, factor*factor*notional_z0])
+notional_z0 = 150.
+factor = 3.
+zs = np.array([notional_z0, factor*notional_z0, factor*factor*notional_z0])
 #zs = np.array([150., 300., 600., 1200.])
 #zs = np.array([30., 60., 120., 240., 480.])
 #zs = np.array([100., 200., 300., 400., 500., 600., 700., 800., 900., 1000.])
@@ -556,7 +556,7 @@ def make_plot_of_wind_data_and_profile(inlier_zs, inlier_averaged_windspeeds,
         fontsize=36)
     ax.set_ylabel(r'$z\, \left( {\rm cm } \right)$', fontsize=36)
 
-    ax.text(0.05, 0.90, "(b)", fontsize=48, transform=ax.transAxes)
+#   ax.text(0.05, 0.90, "(b)", fontsize=48, transform=ax.transAxes)
     ax.text(0.05, 0.825, 
         r'$u_\star = \left( %.0f\pm%.0f \right)\,{\rm cm\ s^{-1}}$' %\
         (ustar, sigma_ustar), fontsize=28, transform=ax.transAxes, 
@@ -577,7 +577,7 @@ def calc_sigma_delta_u(sigma_u):
 def calc_u_prime(u, u_star):
     return kappa*u/u_star
 
-def calc_sigma_scaled_u(u_prime, u_star, u, sigma_u_star, sigma_u):
+def calc_sigma_u_prime(u_prime, u_star, u, sigma_u_star, sigma_u):
     return u_prime*np.sqrt((sigma_u_star/u_star)**2 + (sigma_u/u)**2)
 
 def fit_delta_u(z, u_star):
@@ -593,3 +593,61 @@ def fit_log_zstar(z, z_star):
 
     return log_z - log_z_star
 
+def fit_wind_profile_scaled_values(zs, windspeeds, sigma_windspeeds,
+    rescale_unc=False):
+    # Fit u_star
+    delta_u = calc_delta_u(windspeeds)
+    sigma_delta_u = calc_sigma_delta_u(sigma_windspeeds)
+    u_star, sigma_u_star_sq =\
+        curve_fit(fit_delta_u, zs, delta_u, sigma=sigma_delta_u)
+    sigma_u_star = np.sqrt(sigma_u_star_sq)[0]
+
+    # Fit z_star
+    u_prime = calc_u_prime(windspeeds, u_star)
+    sigma_u_prime =\
+        calc_sigma_u_prime(u_prime, u_star, windspeeds, 
+            sigma_u_star, sigma_windspeeds)
+    z_star, sigma_z_star_sq = curve_fit(fit_log_zstar, zs, u_prime,
+        sigma=sigma_u_prime)
+    sigma_z_star = np.sqrt(sigma_z_star_sq)[0]
+
+    if(rescale_unc):
+        mod = wind_profile(zs, u_star, z_star)
+        chisq = chisqg(windspeeds, mod, sd=sigma_windspeeds)
+
+        red_chi_sq = chisq/(len(windspeeds) - 2.)
+
+        sigma_u_star *= np.sqrt(red_chi_sq)
+        sigma_z_star *= np.sqrt(red_chi_sq)
+        sigma_windspeeds *= np.sqrt(red_chi_sq)
+
+    return u_star, z_star, sigma_u_star, sigma_z_star, sigma_windspeeds
+
+def make_plot_of_wind_data_and_profile_scaled_values(zs, windspeeds, 
+    sigma_windspeeds, u_star, z_star, sigma_u_star, sigma_z_star, ax):
+
+    ax.errorbar(windspeeds, zs, xerr=sigma_windspeeds,
+        marker='o', markersize=10, color=BoiseState_blue, ls='')
+
+    log_z = np.log(zs/np.min(zs))
+    ax.plot(wind_profile(zs, u_star, z_star), zs,
+        lw=6, color=BoiseState_orange, ls='--', zorder=-1)
+
+    ax.grid(True)
+    ax.yaxis.tick_right()
+    ax.yaxis.set_label_position("right")
+    ax.tick_params(labelsize=24)
+    ax.set_xlabel(r'$\langle U \rangle \, \left( {\rm cm\ s^{-1} } \right)$',
+        fontsize=36)
+    ax.set_ylabel(r'$z\, \left( {\rm cm } \right)$', fontsize=36)
+
+    ax.text(0.05, 0.90, "(b)", fontsize=48, transform=ax.transAxes)
+    ax.text(0.05, 0.825,
+        r'$u_\star = \left( %.0f\pm%.0f \right)\,{\rm cm\ s^{-1}}$' %\
+        (u_star, sigma_u_star), fontsize=28, transform=ax.transAxes,
+        color=BoiseState_orange)
+    ax.text(0.05, 0.775, r'$z_\star = \left( %.2f\pm%.2f \right)\,{\rm cm}$' %\
+        (z_star, sigma_z_star), fontsize=28, transform=ax.transAxes,
+        color=BoiseState_orange)
+
+    return ax
