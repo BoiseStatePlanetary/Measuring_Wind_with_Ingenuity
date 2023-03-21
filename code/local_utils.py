@@ -607,9 +607,13 @@ def fit_wind_profile_scaled_values(zs, windspeeds, sigma_windspeeds,
     sigma_u_prime =\
         calc_sigma_u_prime(u_prime, u_star, windspeeds, 
             sigma_u_star, sigma_windspeeds)
-    z_star, sigma_z_star_sq = curve_fit(fit_log_zstar, zs, u_prime,
-        sigma=sigma_u_prime)
-    sigma_z_star = np.sqrt(sigma_z_star_sq)[0]
+    try:
+        z_star, sigma_z_star_sq = curve_fit(fit_log_zstar, zs, u_prime,
+            sigma=sigma_u_prime)
+        sigma_z_star = np.sqrt(sigma_z_star_sq)[0]
+    except:
+        z_star = 0.
+        sigma_z_star = 0.
 
     if(rescale_unc):
         mod = wind_profile(zs, u_star, z_star)
