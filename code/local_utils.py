@@ -645,7 +645,7 @@ def make_plot_of_wind_data_and_profile_scaled_values(zs, windspeeds,
         fontsize=36)
     ax.set_ylabel(r'$z\, \left( {\rm cm } \right)$', fontsize=36)
 
-    ax.text(0.05, 0.90, "(b)", fontsize=48, transform=ax.transAxes)
+#   ax.text(0.05, 0.90, "(b)", fontsize=48, transform=ax.transAxes)
     ax.text(0.05, 0.825,
         r'$u_\star = \left( %.0f\pm%.0f \right)\,{\rm cm\ s^{-1}}$' %\
         (u_star, sigma_u_star), fontsize=28, transform=ax.transAxes,
