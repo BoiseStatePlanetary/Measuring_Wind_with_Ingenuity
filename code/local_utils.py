@@ -6,6 +6,9 @@ from datetime import datetime, timedelta
 import matplotlib.dates as md
 
 from scipy.stats import median_abs_deviation as mad
+from numpy.random import normal, uniform
+
+from astropy.convolution import convolve, Box1DKernel
 
 aspect_ratio = 16./9 
 BoiseState_blue = "#0033A0"
@@ -655,3 +658,19 @@ def make_plot_of_wind_data_and_profile_scaled_values(zs, windspeeds,
         color=BoiseState_orange)
 
     return ax
+
+def generate_synthetic_wind(time, wind, corr_time=30.):
+    # 2023 Mar 28 - corr_time of about 30 seconds seems to be right
+
+    sampling = (time[1].second + time[1].microsecond/1e6) -\
+        (time[0].second + time[0].microsecond/1e6)
+    num_points = int(np.floor(corr_time/sampling))
+
+    # Boxcar filter to inject red noise - sqrt(2) seems to reproduce scatter
+    synthetic_wind = np.median(wind) +\
+        convolve(normal(size=len(time)),
+        Box1DKernel(num_points))*np.sqrt(2.)*(np.max(wind) - np.min(wind))
+    # Be sure to remove negative values
+    synthetic_wind -= np.min(synthetic_wind)
+
+    return synthetic_wind
