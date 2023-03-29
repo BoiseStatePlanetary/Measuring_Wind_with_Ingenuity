@@ -356,12 +356,12 @@ def sample_wind_profile(sample_time, t0, time, windspeeds, heights):
     return averaged_windspeeds, std_windspeeds
 
 def make_plot_of_original_and_scaled_windspeeds(time, wind, zs, sample_time, t0,
-    scaled_windspeeds, averaged_windspeeds, ax):
+    scaled_windspeeds, averaged_windspeeds, ax, label="MEDA"):
 
     from itertools import cycle
     colors = cycle([BoiseState_blue, BoiseState_orange, "green", "purple"])
 
-    ax.plot(time, wind, lw=3, color=BoiseState_blue, label="MEDA")
+    ax.plot(time, wind, lw=3, color=BoiseState_blue, label=label)
 
     cur_t0 = t0
     for i in range(len(zs)):
