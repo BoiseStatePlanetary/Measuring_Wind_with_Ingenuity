@@ -19,17 +19,25 @@ str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 
 #zs = np.array([150., 300., 600., 1200.])
 #zs = np.array([150., 600., 1200.])
-notional_z0 = 150.
-factor = 3.
-zs = np.array([notional_z0, factor*notional_z0, factor*factor*notional_z0])
+#notional_z0 = 150.
+#factor = 3.
+#zs = np.array([notional_z0, factor*notional_z0, factor*factor*notional_z0])
 #zs = np.array([150., 300., 600., 1200.])
 #zs = np.array([30., 60., 120., 240., 480.])
 #zs = np.array([100., 200., 300., 400., 500., 600., 700., 800., 900., 1000.])
-sampling_duration = 40. # seconds to sample an altitude
+#sampling_duration = 40. # seconds to sample an altitude
+settle_time = timedelta(seconds=1.)
+sampling_duration = 4. # 2023 Sep 13 - Brown's flight
 sample_time = timedelta(seconds=sampling_duration) # as a time delta
 
-start_time = datetime(1900, 1, 1, 7, 0, 0)
-end_time = datetime(1900, 1, 1, 8, 0, 0)
+# 2023 Sep 13 - Actual sample points
+zs = np.array([400., 800., 1200., 1600., 2000.])
+
+#start_time = datetime(1900, 1, 1, 7, 0, 0)
+#end_time = datetime(1900, 1, 1, 8, 0, 0)
+
+start_time = datetime(1900, 1, 1, 15, 0, 0)
+end_time = datetime(1900, 1, 1, 16, 0, 0)
 
 kappa = 0.4
 
@@ -267,7 +275,8 @@ def calc_sigma_zstar(z0, slope, intercept, sigma_slope, sigma_intercept, kappa=0
 def calc_sigma_ustar(sigma_slope, kappa=0.4):
     return kappa*sigma_slope
 
-def retrieve_time_wind(xml_file, start_time=start_time, end_time=end_time):
+def retrieve_time_wind(xml_file, 
+    start_time=start_time, end_time=end_time):
 
     struct_list = pds.read(xml_file)
     time_list = list(map(lambda x: x.split('M')[1],
@@ -323,7 +332,8 @@ def create_synthetic_wind_profile(windspeeds_to_scale, zs, zstar, z0=150.):
 def retrieve_relevant_times(time, t0, sample_time):
     return (t0 <= time) & (time <= t0 + sample_time)
 
-def sample_wind_profile(sample_time, t0, time, windspeeds, heights):
+def sample_wind_profile(sample_time, t0, time, windspeeds, heights,
+    settle_time=None, over_sample=None, add_noise=None):
     """
     Return wind speeds from four height sampled over the given sample time
 
@@ -332,6 +342,12 @@ def sample_wind_profile(sample_time, t0, time, windspeeds, heights):
         t0 (float, optional): time at which at start averages
         times (float array): measured times
         windspeeds (float array): wind speed time-series referenced by anemometer height
+        settle_time (optional, float): time for drone to stabilize
+        over_sample (optional, float): If you want to over-sample data,
+            this number represents the actual sample time you want. Wind data
+            will be interpolated to this sampling.
+        add_noise (optional, float): If not none, add in random noise with this
+            scatter
 
     Returns:
         Wind speeds averaged for sample time from different anemometer times series, one after another
@@ -352,6 +368,11 @@ def sample_wind_profile(sample_time, t0, time, windspeeds, heights):
             (np.sqrt(len(windspeeds[i][ind]) - 1.))
 
         cur_t0 += sample_time
+
+        if(settle_time is not None):
+            print(cur_t0)
+            cur_t0 += settle_time
+            print(cur_t0)
 
     return averaged_windspeeds, std_windspeeds
 
