@@ -27,7 +27,7 @@ str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 #zs = np.array([100., 200., 300., 400., 500., 600., 700., 800., 900., 1000.])
 #sampling_duration = 40. # seconds to sample an altitude
 settle_time = timedelta(seconds=1.)
-sampling_duration = 4. # 2023 Sep 13 - Brown's flight
+sampling_duration = 8. # 2023 Sep 13 - Brown's flight
 sample_time = timedelta(seconds=sampling_duration) # as a time delta
 
 # 2023 Sep 13 - Actual sample points
@@ -370,14 +370,13 @@ def sample_wind_profile(sample_time, t0, time, windspeeds, heights,
         cur_t0 += sample_time
 
         if(settle_time is not None):
-            print(cur_t0)
             cur_t0 += settle_time
-            print(cur_t0)
 
     return averaged_windspeeds, std_windspeeds
 
 def make_plot_of_original_and_scaled_windspeeds(time, wind, zs, sample_time, t0,
-    scaled_windspeeds, averaged_windspeeds, ax, label="MEDA"):
+    scaled_windspeeds, averaged_windspeeds, ax, label="MEDA",
+    settle_time=None):
 
     from itertools import cycle
     colors = cycle([BoiseState_blue, BoiseState_orange, "green", "purple"])
@@ -394,6 +393,9 @@ def make_plot_of_original_and_scaled_windspeeds(time, wind, zs, sample_time, t0,
             [averaged_windspeeds[i], averaged_windspeeds[i]], lw=6, ls='--', 
             color='k')
         cur_t0 += sample_time
+
+        if(settle_time is not None):
+            cur_t0 += settle_time
 
 
     xfmt = md.DateFormatter('%M:%S')
@@ -581,13 +583,13 @@ def make_plot_of_wind_data_and_profile(inlier_zs, inlier_averaged_windspeeds,
     ax.set_ylabel(r'$z\, \left( {\rm cm } \right)$', fontsize=36)
 
 #   ax.text(0.05, 0.90, "(b)", fontsize=48, transform=ax.transAxes)
-    ax.text(0.05, 0.825, 
-        r'$u_\star = \left( %.0f\pm%.0f \right)\,{\rm cm\ s^{-1}}$' %\
-        (ustar, sigma_ustar), fontsize=28, transform=ax.transAxes, 
-        color=BoiseState_orange)
-    ax.text(0.05, 0.775, r'$z_\star = \left( %.2f\pm%.2f \right)\,{\rm cm}$' %\
-        (zstar, sigma_zstar), fontsize=28, transform=ax.transAxes, 
-        color=BoiseState_orange)
+#   ax.text(0.05, 0.825, 
+#       r'$u_\star = \left( %.0f\pm%.0f \right)\,{\rm cm\ s^{-1}}$' %\
+#       (ustar, sigma_ustar), fontsize=28, transform=ax.transAxes, 
+#       color=BoiseState_orange)
+#   ax.text(0.05, 0.775, r'$z_\star = \left( %.2f\pm%.2f \right)\,{\rm cm}$' %\
+#       (zstar, sigma_zstar), fontsize=28, transform=ax.transAxes, 
+#       color=BoiseState_orange)
 
     return ax
 def calc_delta_u(u):
