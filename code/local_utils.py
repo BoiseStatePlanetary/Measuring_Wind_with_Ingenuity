@@ -26,7 +26,9 @@ str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 #zs = np.array([30., 60., 120., 240., 480.])
 #zs = np.array([100., 200., 300., 400., 500., 600., 700., 800., 900., 1000.])
 #sampling_duration = 40. # seconds to sample an altitude
-settle_time = timedelta(seconds=1.)
+
+settle_time_seconds = 1
+settle_time = timedelta(seconds=settle_time_seconds)
 sampling_duration = 8. # 2023 Sep 13 - Brown's flight
 sample_time = timedelta(seconds=sampling_duration) # as a time delta
 
@@ -36,8 +38,8 @@ zs = np.array([400., 800., 1200., 1600., 2000.])
 #start_time = datetime(1900, 1, 1, 7, 0, 0)
 #end_time = datetime(1900, 1, 1, 8, 0, 0)
 
-start_time = datetime(1900, 1, 1, 15, 0, 0)
-end_time = datetime(1900, 1, 1, 16, 0, 0)
+start_time = datetime(1900, 1, 1, 11, 6, 0)
+end_time = datetime(1900, 1, 1, 12, 6, 0)
 
 kappa = 0.4
 
