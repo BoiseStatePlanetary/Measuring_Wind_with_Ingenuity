@@ -29,7 +29,9 @@ str2dates = lambda xs: [str2date(xs[i]) for i in range(len(xs))]
 
 settle_time_seconds = 1
 settle_time = timedelta(seconds=settle_time_seconds)
-sampling_duration = 8. # 2023 Sep 13 - Brown's flight
+#sampling_duration = 8. # 2023 Sep 13 - Brown's flight
+#sampling_duration = 12. # 2023 Sep 27
+sampling_duration = 5. # 2023 Sep 27
 sample_time = timedelta(seconds=sampling_duration) # as a time delta
 
 # 2023 Sep 13 - Actual sample points
@@ -38,8 +40,11 @@ zs = np.array([400., 800., 1200., 1600., 2000.])
 #start_time = datetime(1900, 1, 1, 7, 0, 0)
 #end_time = datetime(1900, 1, 1, 8, 0, 0)
 
-start_time = datetime(1900, 1, 1, 11, 6, 0)
-end_time = datetime(1900, 1, 1, 12, 6, 0)
+#start_time = datetime(1900, 1, 1, 11, 6, 0)
+#end_time = datetime(1900, 1, 1, 12, 6, 0)
+
+start_time = datetime(1900, 1, 1, 14, 0, 0)
+end_time = datetime(1900, 1, 1, 15, 6, 0)
 
 kappa = 0.4
 
